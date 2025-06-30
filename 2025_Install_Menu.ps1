@@ -1,4 +1,4 @@
-### File: scripts/DomainJoinAndInstall.ps1
+###file: scripts/DomainJoinAndInstall.ps1
 
 # =============================================================================
 # Script: DomainJoinAndInstall.ps1
