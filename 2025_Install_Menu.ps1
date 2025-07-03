@@ -54,14 +54,15 @@ MAIN MENU:
   5. Reboot computer
   Q. Quit script
 "@
-    $choice = Read-Host "Enter 1, 2, 3, 4, 5, or Q"
 
+    $choice = Read-Host "Enter 1, 2, 3, 4, 5, or Q"
     switch ($choice) {
         '1' {
-            Write-Host "[INFO] Starting domain join without reboot..."
+            Write-Host "Please remember to set the DNS servers and suffix addresses in the adaptor settings before continuing"
+            Write-Host "[INFO] Option 1: Domain Join"
             $newComputerName = Read-Host "Enter the new computer name"
-            $domainName = Read-Host "Enter the domain name (e.g., yourdomain.local)"
-            $domainUser = Read-Host "Enter the domain user (e.g., yourdomain\\administrator)"
+            $domainName = Read-Host "Enter the domain name (e.g., ssc.dftssc.gsi.gov.uk)"
+            $domainUser = Read-Host "Enter the domain user (e.g., ssc\\admin account)"
 
             Add-Type -AssemblyName System.Windows.Forms
             $passwordBox = New-Object System.Windows.Forms.Form
@@ -90,7 +91,7 @@ MAIN MENU:
             }
         }
         '2' {
-            Write-Host "[INFO] Running gpupdate 3 times with 20s sleep..."
+            Write-Host "[INFO] Option 2: Gpupdate 3x with 20s sleep"
             for ($i=1; $i -le 3; $i++) {
                 gpupdate /force | Out-Null
                 Write-Host "[INFO] Completed gpupdate attempt $i. Sleeping 20s..."
@@ -99,28 +100,45 @@ MAIN MENU:
             Write-Host "[INFO] Gpupdate sequence complete."
         }
         '3' {
-            Write-Host "[INFO] Running custom installer block..."
+            Write-Host "[INFO] Option 3: Custom installer block"
             try {
                 # Automatically detect domain FQDN
                 $domain = [System.DirectoryServices.ActiveDirectory.Domain]::GetCurrentDomain()
                 $fqdn = $domain.Name
-                $netlogonPath = "\\\\$fqdn\\netlogon"
+                $netlogonPath = "\\$fqdn\netlogon\"
                 Write-Host "[INFO] Using Netlogon path: $netlogonPath"
 
-                # Add your custom installers below, e.g.:
-                $installer1 = Join-Path $netlogonPath "manageengine\\local_office.exe"
+                # Manage Engine Installer (Silent):
+                $installer1 = Join-Path $netlogonPath "\ManageEngine\Install\LocalOffice_Agent.exe"
                 Start-Process -FilePath $installer1 -ArgumentList "/silent" -Wait -PassThru | Out-Null
                 Write-Host "[INFO] Completed: $installer1"
+				# Correct location in all domains
 
-                # Add more installers as needed:
+                # Sophos Installer (Silent):
+                $installer2 = Join-Path $netlogonPath "\Sophos\SophosSetup.exe"
+                Start-Process -FilePath $installer2 -ArgumentList "--messagerelays=10.8.3.4:8190,10.8.3.36:8190" -Wait -PassThru | Out-Null
+                Write-Host "[INFO] Completed: $installer2"
+				
+				# Elastic Installer (Prompts) :
+                $installer3 = Join-Path $netlogonPath "\Elastic\elastic-agent.exe"
+                Start-Process -FilePath $installer3 -ArgumentList "install --url=https://89486c01198942bd8c8db4c4a196b18b.fleet.eu-west-2.aws.cloud.es.io:443 --enrollment-token=QVIwR1JZa0JiNG1ZYmRpZm9EdGY6WWd3MHJLQVdRS3FpdmM5N3FKNVhkQQ== --proxy-url=http://squid.arvtest.co.uk:3128" -Wait -PassThru | Out-Null
+                Write-Host "[INFO] Completed: $installer3"
+				
+				# Install of Sysmon:
+				$installer4 = Join-Path $netlogonPath "\Sysmon\sysmon.exe"
+                Start-Process -FilePath $installer4 -ArgumentList "-accepteula -i \\$fqdn\netlogon\Sysmon\sysmonconfig-export.xml" -Wait -PassThru | Out-Null
+				Start-Process -FilePath $installer4 -ArgumentList "-accepteula -m" -Wait -PassThru | Out-Null
+                Write-Host "[INFO] Completed: $installer4"
+								
+				# Add more installers as needed:
                 # $installer2 = Join-Path $netlogonPath "anotherapp\\setup.exe"
                 # Start-Process -FilePath $installer2 -ArgumentList "/qn" -Wait -PassThru | Out-Null
-
             } catch {
                 Write-Warning "[WARN] Custom installer command failed: $_"
             }
+        }
         '4' {
-            Write-Host "[INFO] Displaying the most recent log file with paging..."
+            Write-Host "[INFO] Option 4: View logs"
             $latestLog = Get-ChildItem -Path C:\\Temp\\Install -Filter *.txt | Sort-Object LastWriteTime -Descending | Select-Object -First 1
             if ($latestLog) {
                 Get-Content -Path $latestLog.FullName | Out-Host -Paging
@@ -129,8 +147,8 @@ MAIN MENU:
             }
         }
         '5' {
-            Write-Host "[INFO] Rebooting computer..."
-            Restart-Computer -Force
+            Write-Host "[INFO] Option 5: Reboot computer"
+            shutdown.exe /r /f /t 60 /d p:2:4 /c "Restart for updates by $currentUser"
         }
         'Q' {
             Write-Host "[INFO] Exiting script. Goodbye."
@@ -141,6 +159,7 @@ MAIN MENU:
             Write-Warning "Invalid option. Please enter 1, 2, 3, 4, 5, or Q."
         }
     }
-    Write-Host "\nReturning to Main Menu..."
-
+    Write-Host "Press any key to Return to Main Menu..."
+    Pause
+    Clear-Host
 } while ($true)
