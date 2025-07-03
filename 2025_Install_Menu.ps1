@@ -1,14 +1,10 @@
-###file: scripts/DomainJoinAndInstall.ps1
-
 # =============================================================================
-# Script: DomainJoinAndInstall.ps1
-# Description: Interactive script with disclaimer and separate options for:
-#   1) Domain join (no reboot),
-#   2) Gpupdate,
-#   3) Custom installs,
-#   4) View logs,
-#   5) Reboot.
+#
+# Script: Instance_Post_Build.ps1
+# Description: Interactive script with disclaimer and separate options 
 # Author: James Buller.
+# Creation Date: Date: 3rd July 2025
+# 
 # =============================================================================
 
 $logDir = "C:\\Temp\\Install"
