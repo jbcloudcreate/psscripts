@@ -16,6 +16,10 @@ try {
     exit 1
 }
 
+# Get user and computer info
+$CurrentUser = $env:USERNAME
+$CurrentComputer = $env:COMPUTERNAME
+
 # Set log path to netlogon\decommission
 $NetlogonPath = "\\$DomainFQDN\netlogon\decommission"
 if (-not (Test-Path $NetlogonPath)) {
@@ -32,8 +36,8 @@ $LogFile = Join-Path $NetlogonPath "DecommissionLog_$(Get-Date -Format yyyyMMdd_
 
 function Log {
     param([string]$Message)
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    "$timestamp - $Message" | Tee-Object -FilePath $LogFile -Append
+    $timestamp = Get-Date -Format "dd/MM/yyyy HH:mm:ss"
+    "$timestamp [$CurrentUser@$CurrentComputer] - $Message" | Tee-Object -FilePath $LogFile -Append
 }
 
 # Disclaimer
@@ -51,13 +55,20 @@ if ($response -ne 'Yes') {
 Log "User accepted the disclaimer."
 
 # Create local admin account
+Add-Type -AssemblyName PresentationCore,PresentationFramework
+
 $Username = "ssc-localadmin"
-$Password = [System.Web.Security.Membership]::GeneratePassword(20,3) | ConvertTo-SecureString -AsPlainText -Force
+$PlainPassword = [System.Web.Security.Membership]::GeneratePassword(20,3)
+$Password = $PlainPassword | ConvertTo-SecureString -AsPlainText -Force
 try {
     if (-not (Get-LocalUser -Name $Username -ErrorAction SilentlyContinue)) {
         New-LocalUser -Name $Username -Password $Password -FullName "Local Administrator" -Description "Decommission local admin account"
         Add-LocalGroupMember -Group "Administrators" -Member $Username
         Log "Created local admin account: $Username"
+
+        # Display password in a popup with option to copy to clipboard
+        Set-Clipboard -Value $PlainPassword
+        [System.Windows.MessageBox]::Show("Local admin '$Username' password:\n$PlainPassword\n\nPassword has been copied to clipboard.", "Local Admin Password", 'OK', 'Info')
     } else {
         Log "Local admin account already exists: $Username"
     }
@@ -74,6 +85,58 @@ foreach ($svc in $ServicesToStop) {
         Log "Failed to stop service: $svc - $_"
     }
 }
+
+# Sophos Uninstall Script
+
+Log "Starting Sophos uninstall script..."
+
+# Check tamper protection status via Sophos registry key
+$TamperKey = "HKLM:\SOFTWARE\Sophos\Management\Policy\TamperProtection"
+$TamperEnabled = $null
+if (Test-Path $TamperKey) {
+    try {
+        $TamperValue = Get-ItemProperty -Path $TamperKey -Name Enabled -ErrorAction Stop
+        $TamperEnabled = $TamperValue.Enabled
+        if ($TamperEnabled -eq 0) {
+            Log "Tamper protection is DISABLED. Proceeding with uninstall."
+        } else {
+            Log "Tamper protection is ENABLED. Aborting uninstall."
+            exit 1
+        }
+    } catch {
+        Log "Error reading tamper protection status: $_"
+        exit 1
+    }
+} else {
+    Log "Tamper protection registry key not found. Assuming protection is disabled."
+}
+
+# Array of Sophos product display names in recommended uninstall order
+$SophosProducts = @(
+    "Sophos AutoUpdate",
+    "Sophos Network Threat Protection",
+    "Sophos Endpoint Defense",
+    "Sophos Endpoint Agent",
+    "Sophos Anti-Virus"
+)
+
+foreach ($Product in $SophosProducts) {
+    Log "Searching for $Product..."
+    $App = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -like "$Product*" }
+    if ($App) {
+        Log "Uninstalling $($App.Name)..."
+        try {
+            $App.Uninstall() | Out-Null
+            Log "Successfully uninstalled $($App.Name)"
+        } catch {
+            Log "Failed to uninstall $($App.Name): $_"
+        }
+    } else {
+        Log "$Product not found, skipping."
+    }
+}
+
+Log "Sophos uninstall script completed."
 
 # Uninstall applications
 $AppsToUninstall = @("AppName1","AppName2") # Replace with actual display names
