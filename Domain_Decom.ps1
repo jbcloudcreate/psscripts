@@ -138,6 +138,55 @@ foreach ($Product in $SophosProducts) {
 
 Log "Sophos uninstall script completed."
 
+# ManageEngine Patch Agent Uninstall Script
+
+Log "Starting ManageEngine Patch Agent uninstall script..."
+
+# Array of common ManageEngine agent product display names
+$MEProducts = @(
+    "ManageEngine Patch Manager Plus Agent",
+    "ManageEngine Endpoint Central Agent",
+    "DesktopCentral Agent"
+)
+
+foreach ($Product in $MEProducts) {
+    Log "Searching for $Product..."
+    $App = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -like "$Product*" }
+    if ($App) {
+        Log "Uninstalling $($App.Name)..."
+        try {
+            $App.Uninstall() | Out-Null
+            Log "Successfully uninstalled $($App.Name)"
+        } catch {
+            Log "Failed to uninstall $($App.Name): $_"
+        }
+    } else {
+        Log "$Product not found, skipping."
+    }
+}
+
+Log "ManageEngine Patch Agent uninstall script completed."
+
+# Elastic Agent Silent Uninstall Script
+
+Log "Starting Elastic Agent uninstall script..."
+
+$ElasticAgentPath = "C:\\Program Files\\Elastic\\Agent\\elastic-agent.exe"
+
+if (Test-Path $ElasticAgentPath) {
+    Log "Found Elastic Agent. Uninstalling silently..."
+    try {
+        & $ElasticAgentPath uninstall --force
+        Log "Elastic Agent uninstalled successfully."
+    } catch {
+        Log "Failed to uninstall Elastic Agent: $_"
+    }
+} else {
+    Log "Elastic Agent not found at $ElasticAgentPath, skipping."
+}
+
+Log "Elastic Agent uninstall script completed."
+
 # Uninstall applications
 $AppsToUninstall = @("AppName1","AppName2") # Replace with actual display names
 foreach ($app in $AppsToUninstall) {
