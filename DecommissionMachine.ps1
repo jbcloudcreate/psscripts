@@ -1,4 +1,11 @@
-### File: C:\Scripts\DecommissionMachine.ps1
+# =============================================================================
+#
+# Script: Domain_Decom.ps1
+# Description: Script with disclaimer to decommision AWS Instance 
+# Author: James Buller.
+# Creation Date: Date: 5th July 2025
+# 
+# =============================================================================
 
 # Determine domain FQDN
 try {
