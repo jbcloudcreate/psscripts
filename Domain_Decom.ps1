@@ -7,6 +7,37 @@
 # 
 # =============================================================================
 
+# Corrected version check and auto-update logic from GitHub
+
+$CurrentVersion = "1.0.0"
+$RepoRawUrl = "https://raw.githubusercontent.com/jbcloudcreate/psscripts/main/Domain_Decom.ps1"
+
+try {
+    Log "Checking for updated script version at $RepoRawUrl"
+    $RemoteScriptContent = Invoke-WebRequest -Uri $RepoRawUrl -UseBasicParsing -ErrorAction Stop | Select-Object -ExpandProperty Content
+    if ($RemoteScriptContent -match '\\$CurrentVersion\\s*=\\s*"([\\d\\.]+)"') {
+        $RemoteVersion = $Matches[1]
+        Log "Remote script version detected: $RemoteVersion"
+        if ($RemoteVersion -ne $CurrentVersion) {
+            Log "New version available. Downloading updated script..."
+            $LocalScriptPath = $PSCommandPath
+            $BackupPath = "$LocalScriptPath.bak"
+            Copy-Item -Path $LocalScriptPath -Destination $BackupPath -Force
+            $RemoteScriptContent | Out-File -FilePath $LocalScriptPath -Encoding UTF8
+            Log "Script updated to version $RemoteVersion. Relaunching new version."
+            Write-LogColor "🔄 Script updated to version $RemoteVersion. Relaunching..." Cyan
+            Start-Process powershell.exe -ArgumentList "-ExecutionPolicy Bypass -File `"$LocalScriptPath`"" -Verb RunAs
+            exit 0
+        } else {
+            Log "Current script is up-to-date (version $CurrentVersion)."
+        }
+    } else {
+        Log-Error "Could not determine remote script version. Skipping update."
+    }
+} catch {
+    Log-Error "Version check or update failed: $_"
+}
+
 # Check for administrator privileges and auto-elevate if needed
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     $promptTitle = "Administrator Privileges Required"
