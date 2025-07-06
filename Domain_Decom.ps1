@@ -1,3 +1,4 @@
+$CurrentVersion = "1.0.0"
 # =============================================================================
 #
 # Script: Domain_Decom.ps1
@@ -7,6 +8,88 @@
 # 
 # =============================================================================
 
+Clear-Host
+# Ensure Log-Error function exists to avoid runtime errors
+
+function Write-LogColor {
+    param (
+        [string]$Message,
+        [System.ConsoleColor]$Color = 'White'
+    )
+    Write-Host $Message -ForegroundColor $Color
+}
+
+$NetlogonPath = "$env:USERPROFILE\\Desktop\\DecommissionLogs"
+if (-not (Test-Path $NetlogonPath)) {
+    New-Item -Path $NetlogonPath -ItemType Directory -Force | Out-Null
+}
+$UKDate = Get-Date -Format "ddMMyyyy_HHmmss"
+$LogFile = Join-Path $NetlogonPath "DecommissionLog_${UKDate}.txt"
+Write-Host "Logging to file: $LogFile"
+
+function Log {
+    param([string]$Message)
+    $timestamp = Get-Date -Format "dd/MM/yyyy HH:mm:ss"
+    $entry = "$timestamp [$env:USERNAME@$env:COMPUTERNAME] - $Message"
+    $entry | Tee-Object -FilePath $LogFile -Append
+    Write-LogColor $entry
+}
+
+Log "Script started for local debugging."
+
+function Log {
+    param([string]$Message)
+    $timestamp = Get-Date -Format "dd/MM/yyyy HH:mm:ss"
+    $entry = "$timestamp [$env:USERNAME@$env:COMPUTERNAME] - $Message"
+    $entry | Tee-Object -FilePath $LogFile -Append
+    Write-LogColor $entry
+}
+
+function Log-Error {
+    param([string]$Message)
+    Log $Message
+    Write-LogColor "$Message" Red
+    $Global:UninstallErrors += $Message
+}
+
+# Determine Netlogon path with reliable fallback for local or non-domain testing
+
+if (-not [string]::IsNullOrWhiteSpace($DomainFQDN)) {
+    $NetlogonPath = "\\\\$DomainFQDN\\netlogon\\decommission"
+    if (-not (Test-Path $NetlogonPath)) {
+        try {
+            New-Item -Path $NetlogonPath -ItemType Directory -Force | Out-Null
+            Log "Created folder: $NetlogonPath"
+        } catch {
+            Log-Error "Could not create folder at $NetlogonPath. Falling back to local desktop log."
+            $DomainFQDN = $null  # Force fallback below
+        }
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($DomainFQDN)) {
+    $DesktopPath = [Environment]::GetFolderPath("Desktop")
+    $NetlogonPath = Join-Path $DesktopPath "DecommissionLogs"
+    if (-not (Test-Path $NetlogonPath)) {
+        New-Item -Path $NetlogonPath -ItemType Directory -Force | Out-Null
+    }
+    Log "Using local log path: $NetlogonPath"
+}
+
+# Set LogFile after Netlogon or fallback path is finalized
+$UKDate = Get-Date -Format "ddMMyyyy_HHmmss"
+$LogFile = Join-Path $NetlogonPath "DecommissionLog_${UKDate}.txt"
+Log "Logging to file: $LogFile"
+
+# Quick test to verify logging works end-to-end
+
+Log "Testing log entry: INFO level log."
+Write-LogColor "Test success message in green." Green
+Write-LogColor "Test warning message in yellow." Yellow
+Write-LogColor "Test error message in red." Red
+
+Log "Test completed successfully."
+
 # Corrected version check and auto-update logic from GitHub
 
 $CurrentVersion = "1.0.0"
@@ -15,7 +98,11 @@ $RepoRawUrl = "https://raw.githubusercontent.com/jbcloudcreate/psscripts/main/Do
 try {
     Log "Checking for updated script version at $RepoRawUrl"
     $RemoteScriptContent = Invoke-WebRequest -Uri $RepoRawUrl -UseBasicParsing -ErrorAction Stop | Select-Object -ExpandProperty Content
-    if ($RemoteScriptContent -match '\\$CurrentVersion\\s*=\\s*"([\\d\\.]+)"') {
+
+    # Debug: log first lines of downloaded script for troubleshooting
+    Log "First lines of downloaded script:\n$($RemoteScriptContent -split "`n" | Select-Object -First 10 | Out-String)"
+
+    if ($RemoteScriptContent -match '\\$CurrentVersion\\s*=\\s*\"(\d+(\\.\d+)*)\"') {
         $RemoteVersion = $Matches[1]
         Log "Remote script version detected: $RemoteVersion"
         if ($RemoteVersion -ne $CurrentVersion) {
@@ -25,18 +112,19 @@ try {
             Copy-Item -Path $LocalScriptPath -Destination $BackupPath -Force
             $RemoteScriptContent | Out-File -FilePath $LocalScriptPath -Encoding UTF8
             Log "Script updated to version $RemoteVersion. Relaunching new version."
-            Write-LogColor "🔄 Script updated to version $RemoteVersion. Relaunching..." Cyan
+            Log "🔄 Script updated to version $RemoteVersion. Relaunching..."
             Start-Process powershell.exe -ArgumentList "-ExecutionPolicy Bypass -File `"$LocalScriptPath`"" -Verb RunAs
             exit 0
         } else {
             Log "Current script is up-to-date (version $CurrentVersion)."
         }
     } else {
-        Log-Error "Could not determine remote script version. Skipping update."
+        Log "Could not determine remote script version. Skipping update."
     }
 } catch {
-    Log-Error "Version check or update failed: $_"
+    Log "Version check or update failed: $_"
 }
+
 
 # Check for administrator privileges and auto-elevate if needed
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
