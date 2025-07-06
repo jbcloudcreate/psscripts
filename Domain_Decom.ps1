@@ -7,13 +7,32 @@
 # 
 # =============================================================================
 
-# Determine domain FQDN
-try {
-    $DomainFQDN = ([System.DirectoryServices.ActiveDirectory.Domain]::GetComputerDomain()).Name
-    Log "Detected domain FQDN: $DomainFQDN"
-} catch {
-    Write-Error "ERROR: Could not determine domain FQDN. Exiting."
-    exit 1
+# Check for administrator privileges and auto-elevate if needed
+if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    $promptTitle = "Administrator Privileges Required"
+    $promptMessage = "This script must run with elevated permissions to perform all actions.\n\nDo you want to restart it as administrator now?"
+    $confirmTime = Get-Date -Format "dd/MM/yyyy HH:mm:ss"
+    $confirm = [System.Windows.Forms.MessageBox]::Show($promptMessage, $promptTitle,'YesNo','Question')
+    Log "$confirmTime - Elevation prompt displayed. User response: $confirm"
+    if ($confirm -ne 'Yes') {
+        Log "$confirmTime - User declined elevation. Exiting script."
+        Write-Error "User declined elevation. Exiting."
+        exit 1
+    }
+
+    Log "$confirmTime - Elevation prompt accepted. Relaunching script as administrator."
+
+    $procInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $procInfo.FileName = "powershell.exe"
+    $procInfo.Arguments = "-ExecutionPolicy Bypass -File `"$PSCommandPath`""
+    $procInfo.Verb = "runas"
+    try {
+        [System.Diagnostics.Process]::Start($procInfo) | Out-Null
+    } catch {
+        Write-Error "ERROR: User cancelled elevation or elevation failed. Exiting."
+        Log "$confirmTime - Elevation attempt failed or cancelled by user."
+    }
+    exit 0
 }
 
 # Get user and computer info
@@ -86,12 +105,11 @@ foreach ($svc in $ServicesToStop) {
     }
 }
 
-# Sophos Uninstall Script
-
 Log "Starting Sophos uninstall script..."
+$ScriptStartTime = Get-Date
 
 # Check tamper protection status via Sophos registry key
-$TamperKey = "HKLM:\SOFTWARE\Sophos\Management\Policy\TamperProtection"
+$TamperKey = "HKLM:\\SOFTWARE\\Sophos\\Management\\Policy\\TamperProtection"
 $TamperEnabled = $null
 if (Test-Path $TamperKey) {
     try {
@@ -120,15 +138,24 @@ $SophosProducts = @(
     "Sophos Anti-Virus"
 )
 
+$ActivityName = "Sophos Uninstall"
+$ProgressPercent = 0
+
 foreach ($Product in $SophosProducts) {
     Log "Searching for $Product..."
+    Write-Progress -Activity $ActivityName -Status "Looking for $Product..." -PercentComplete $ProgressPercent
     $App = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -like "$Product*" }
     if ($App) {
         Log "Uninstalling $($App.Name)..."
         try {
+            $ProgressPercent = 50
+            Write-Progress -Activity $ActivityName -Status "Uninstalling $($App.Name)... (Estimated: ~15 seconds remaining)" -PercentComplete $ProgressPercent
             $App.Uninstall() | Out-Null
-            Log "Successfully uninstalled $($App.Name)"
+            $ProgressPercent = 100
+            Write-Progress -Activity $ActivityName -Status "Uninstall of $($App.Name) complete." -PercentComplete $ProgressPercent -Completed
+            Log "Successfully uninstalled $($App.Name)."
         } catch {
+            Write-Progress -Activity $ActivityName -Status "Failed to uninstall $($App.Name)." -PercentComplete $ProgressPercent -Completed
             Log "Failed to uninstall $($App.Name): $_"
         }
     } else {
@@ -136,11 +163,14 @@ foreach ($Product in $SophosProducts) {
     }
 }
 
-Log "Sophos uninstall script completed."
+$ScriptEndTime = Get-Date
+$TotalDuration = ($ScriptEndTime - $ScriptStartTime).TotalSeconds
+Log "Sophos uninstall script completed in $([math]::Round($TotalDuration,1)) seconds."
 
-# ManageEngine Patch Agent Uninstall Script
+# ManageEngine Patch Agent Uninstall Script with dynamic progress and summary timing
 
 Log "Starting ManageEngine Patch Agent uninstall script..."
+$ScriptStartTime = Get-Date
 
 # Array of common ManageEngine agent product display names
 $MEProducts = @(
@@ -149,15 +179,24 @@ $MEProducts = @(
     "DesktopCentral Agent"
 )
 
+$ActivityName = "ManageEngine Uninstall"
+$ProgressPercent = 0
+
 foreach ($Product in $MEProducts) {
     Log "Searching for $Product..."
+    Write-Progress -Activity $ActivityName -Status "Looking for $Product..." -PercentComplete $ProgressPercent
     $App = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -like "$Product*" }
     if ($App) {
         Log "Uninstalling $($App.Name)..."
         try {
+            $ProgressPercent = 50
+            Write-Progress -Activity $ActivityName -Status "Uninstalling $($App.Name)... (Estimated: ~15 seconds remaining)" -PercentComplete $ProgressPercent
             $App.Uninstall() | Out-Null
-            Log "Successfully uninstalled $($App.Name)"
+            $ProgressPercent = 100
+            Write-Progress -Activity $ActivityName -Status "Uninstall of $($App.Name) complete." -PercentComplete $ProgressPercent -Completed
+            Log "Successfully uninstalled $($App.Name)."
         } catch {
+            Write-Progress -Activity $ActivityName -Status "Failed to uninstall $($App.Name)." -PercentComplete $ProgressPercent -Completed
             Log "Failed to uninstall $($App.Name): $_"
         }
     } else {
@@ -165,7 +204,9 @@ foreach ($Product in $MEProducts) {
     }
 }
 
-Log "ManageEngine Patch Agent uninstall script completed."
+$ScriptEndTime = Get-Date
+$TotalDuration = ($ScriptEndTime - $ScriptStartTime).TotalSeconds
+Log "ManageEngine Patch Agent uninstall script completed in $([math]::Round($TotalDuration,1)) seconds."
 
 # Elastic Agent Silent Uninstall Script
 
@@ -173,12 +214,24 @@ Log "Starting Elastic Agent uninstall script..."
 
 $ElasticAgentPath = "C:\\Program Files\\Elastic\\Agent\\elastic-agent.exe"
 
+$ProgressActivity = "Elastic Agent Uninstall"
+$ProgressPercent = 0
+$startTime = Get-Date
+
 if (Test-Path $ElasticAgentPath) {
     Log "Found Elastic Agent. Uninstalling silently..."
+    Write-Progress -Activity $ProgressActivity -Status "Starting uninstall... (Estimated: ~30 seconds)" -PercentComplete $ProgressPercent
     try {
+        $ProgressPercent = 50
+        Write-Progress -Activity $ProgressActivity -Status "Running uninstall command... (Estimated: ~15 seconds remaining)" -PercentComplete $ProgressPercent
         & $ElasticAgentPath uninstall --force
-        Log "Elastic Agent uninstalled successfully."
+        $endTime = Get-Date
+        $duration = ($endTime - $startTime).TotalSeconds
+        $ProgressPercent = 100
+        Write-Progress -Activity $ProgressActivity -Status "Uninstall complete. Took $([math]::Round($duration,1)) seconds." -PercentComplete $ProgressPercent -Completed
+        Log "Elastic Agent uninstalled successfully in $([math]::Round($duration,1)) seconds."
     } catch {
+        Write-Progress -Activity $ProgressActivity -Status "Uninstall failed." -PercentComplete $ProgressPercent -Completed
         Log "Failed to uninstall Elastic Agent: $_"
     }
 } else {
@@ -244,4 +297,6 @@ try {
 }
 
 Log "Script completed successfully. Computer will restart if unjoin was successful."
-Pause
+
+$reboot = Read-Host "Some changes may require a reboot. Reboot now? (Y/N)"
+if ($reboot -eq 'Y') { Restart-Computer -Force }
