@@ -93,6 +93,7 @@ MAIN MENU:
                 Write-Host "[INFO] Completed gpupdate attempt $i. Sleeping 20s..."
                 Start-Sleep -Seconds 20
             }
+			gpresult /SCOPE:COMPUTER /r
             Write-Host "[INFO] Gpupdate sequence complete."
         }
         '3' {
@@ -105,26 +106,31 @@ MAIN MENU:
                 Write-Host "[INFO] Using Netlogon path: $netlogonPath"
 
                 # Manage Engine Installer (Silent):
+				Write-Host "[INFO] Installing: Manage Engine Agent"
                 $installer1 = Join-Path $netlogonPath "\ManageEngine\Install\LocalOffice_Agent.exe"
                 Start-Process -FilePath $installer1 -ArgumentList "/silent" -Wait -PassThru | Out-Null
-                Write-Host "[INFO] Completed: $installer1"
+                Write-Host "[INFO] Completed: Manage Engine Agent"
 				# Correct location in all domains
 
                 # Sophos Installer (Silent):
+				Write-Host "[INFO] Installing: Sophos"
                 $installer2 = Join-Path $netlogonPath "\Sophos\SophosSetup.exe"
                 Start-Process -FilePath $installer2 -ArgumentList "--messagerelays=10.8.3.4:8190,10.8.3.36:8190" -Wait -PassThru | Out-Null
-                Write-Host "[INFO] Completed: $installer2"
+                Write-Host "[INFO] Completed: Sophos"
 				
 				# Elastic Installer (Prompts) :
+				Write-Host "[INFO] Installing: Elastic Agent"
                 $installer3 = Join-Path $netlogonPath "\Elastic\elastic-agent.exe"
                 Start-Process -FilePath $installer3 -ArgumentList "install --url=https://89486c01198942bd8c8db4c4a196b18b.fleet.eu-west-2.aws.cloud.es.io:443 --enrollment-token=QVIwR1JZa0JiNG1ZYmRpZm9EdGY6WWd3MHJLQVdRS3FpdmM5N3FKNVhkQQ== --proxy-url=http://squid.arvtest.co.uk:3128" -Wait -PassThru | Out-Null
-                Write-Host "[INFO] Completed: $installer3"
+                PAUSE
+				Write-Host "[INFO] Completed: Elastic Agent"
 				
 				# Install of Sysmon:
+				Write-Host "[INFO] Installing: Sysmon"
 				$installer4 = Join-Path $netlogonPath "\Sysmon\sysmon.exe"
                 Start-Process -FilePath $installer4 -ArgumentList "-accepteula -i \\$fqdn\netlogon\Sysmon\sysmonconfig-export.xml" -Wait -PassThru | Out-Null
 				Start-Process -FilePath $installer4 -ArgumentList "-accepteula -m" -Wait -PassThru | Out-Null
-                Write-Host "[INFO] Completed: $installer4"
+                Write-Host "[INFO] Completed: Sysmon"
 								
 				# Add more installers as needed:
                 # $installer2 = Join-Path $netlogonPath "anotherapp\\setup.exe"
