@@ -35,7 +35,7 @@ $servicesToCheck = @("ManageEngine UEMS - Agent", "W32Time")
 $processesToCheck = @(
     @{ Name = "dcondemand"; Path = "C:\Program Files (x86)\ManageEngine\UEMS_Agent\bin\dcondemand.exe" },
     @{ Name = "DCProcessMonitor";    Path = "C:\Program Files (x86)\ManageEngine\UEMS_Agent\bin\DCProcessMonitor.exe" },
-	@{ Name = "dcagenttrayicon"; Path = "C:\Program Files (x86)\ManageEngine\UEMS_Agent\bin\dcagenttrayicon.exe" }
+    @{ Name = "dcagenttrayicon"; Path = "C:\Program Files (x86)\ManageEngine\UEMS_Agent\bin\dcagenttrayicon.exe" }
 	
 )
 
