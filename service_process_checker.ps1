@@ -1,4 +1,11 @@
-# File: CheckAndRestart.ps1
+# ===========================================================================================
+#
+# Script: Service_Process_Checker_ME.ps1
+# Description: Script to test if services and processes are running and if not to start them 
+# Author: James Buller / Aamir Miah
+# Creation Date: Date: 17th July 2025
+# 
+# ===========================================================================================
 
 # Utility function to retry a command
 function Retry-Command {
@@ -17,6 +24,7 @@ function Retry-Command {
             if ($i -eq $MaxRetries) {
                 Log-Message "$FailureMessage after $MaxRetries attempts."
                 Write-Warning "$FailureMessage after $MaxRetries attempts."
+                Write-EventLog -LogName Application -Source "ServiceMonitor" -EntryType Warning -EventId 1001 -Message "$FailureMessage after $MaxRetries attempts."
                 return $false
             }
             Start-Sleep -Seconds $DelaySeconds
@@ -31,10 +39,17 @@ if (-not (Test-Path -Path $logDir)) {
 }
 $logFile = Join-Path $logDir "monitor_log.txt"
 
+# Ensure Event Source exists
+if (-not [System.Diagnostics.EventLog]::SourceExists("ServiceMonitor")) {
+    New-EventLog -LogName Application -Source "ServiceMonitor"
+}
+
 function Log-Message {
     param ([string]$Message)
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    "$timestamp - $Message" | Out-File -FilePath $logFile -Append -Encoding UTF8
+    $logEntry = "$timestamp - $Message"
+    $logEntry | Out-File -FilePath $logFile -Append -Encoding UTF8
+    Write-EventLog -LogName Application -Source "ServiceMonitor" -EntryType Information -EventId 1000 -Message $logEntry
 }
 
 $servicesToCheck = @("ManageEngine UEMS - Agent", "W32Time")
