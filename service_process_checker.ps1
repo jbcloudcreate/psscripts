@@ -7,9 +7,28 @@
 # 
 # ===========================================================================================
 
-# Variables
-$currentUser = $env:USERNAME
-$computerName = $env:COMPUTERNAME
+# Utility function to retry a command
+function Retry-Command {
+    param (
+        [ScriptBlock]$Command,
+        [int]$MaxRetries = 3,
+        [int]$DelaySeconds = 2,
+        [string]$FailureMessage
+    )
+
+    for ($i = 1; $i -le $MaxRetries; $i++) {
+        try {
+            & $Command
+            return $true
+        } catch {
+            if ($i -eq $MaxRetries) {
+                Write-Warning "$FailureMessage after $MaxRetries attempts."
+                return $false
+            }
+            Start-Sleep -Seconds $DelaySeconds
+        }
+    }
+}
 
 $servicesToCheck = @("ManageEngine UEMS - Agent", "W32Time")
 
@@ -32,7 +51,7 @@ foreach ($svc in $servicesToCheck) {
 
     if ($service.Status -ne "Running") {
         Write-Host "Starting service '$svc'..." -ForegroundColor Yellow
-        Start-Service -Name $svc
+        Retry-Command -Command { Start-Service -Name $svc } -FailureMessage "Failed to start service '$svc'"
     } else {
         Write-Host "Service '$svc' is running." -ForegroundColor Green
     }
@@ -56,12 +75,12 @@ foreach ($proc in $processesToCheck) {
         if (-not $isResponsive) {
             Write-Warning "Process '$($proc.Name)' is unresponsive. Restarting..."
             $runningProcs | Stop-Process -Force
-            Start-Process -FilePath $proc.Path
+            Retry-Command -Command { Start-Process -FilePath $proc.Path } -FailureMessage "Failed to start process '$($proc.Name)'"
         } else {
             Write-Host "Process '$($proc.Name)' is responsive and running." -ForegroundColor Green
         }
     } else {
         Write-Host "Process '$($proc.Name)' not running. Starting..." -ForegroundColor Yellow
-        Start-Process -FilePath $proc.Path
+        Retry-Command -Command { Start-Process -FilePath $proc.Path } -FailureMessage "Failed to start process '$($proc.Name)'"
     }
 }
