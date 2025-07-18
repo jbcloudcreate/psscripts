@@ -31,14 +31,14 @@ function Retry-Command {
     }
 }
 
-# Logging setup
+# Logging setup to local machine and append everytime its run
 $logDir = "C:\temp\me_logs"
 if (-not (Test-Path -Path $logDir)) {
     New-Item -Path $logDir -ItemType Directory -Force | Out-Null
 }
 $logFile = Join-Path $logDir "monitor_log.txt"
 
-# Ensure Event Source exists
+# Ensure Event Source exists to log in event viewer
 if (-not [System.Diagnostics.EventLog]::SourceExists("ServiceMonitor")) {
     New-EventLog -LogName Application -Source "ServiceMonitor"
 }
@@ -49,12 +49,12 @@ function Log-Message {
         [string]$EventType = "Information",
         [int]$EventId = 1000
     )
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $timestamp = Get-Date -Format "ddMMyyyy HH:mm:ss"
     $logEntry = "$timestamp - $Message"
     $logEntry | Out-File -FilePath $logFile -Append -Encoding UTF8
     Write-EventLog -LogName Application -Source "ServiceMonitor" -EntryType $EventType -EventId $EventId -Message $logEntry
 }
-
+# Define the services and processes here
 $servicesToCheck = @("ManageEngine UEMS - Agent", "W32Time")
 
 $processesToCheck = @(
@@ -63,6 +63,8 @@ $processesToCheck = @(
 	
 )
 
+# Start checking services and starts if not running or unresponsive
+# All logged to event viewer and local logfile
 Write-Host "Checking services..." -ForegroundColor Cyan
 Log-Message "--- Checking services ---" -EventId 1001
 
@@ -80,6 +82,7 @@ foreach ($svc in $servicesToCheck) {
         $msg = "Starting service '$svc'..."
         Write-Host $msg -ForegroundColor Yellow
         Log-Message $msg -EventType "Warning" -EventId 1202
+		# Retry Command here if unresponsive
         Retry-Command -Command { Start-Service -Name $svc } -FailureMessage "Failed to start service '$svc'"
     } else {
         $msg = "Service '$svc' is running."
@@ -88,6 +91,8 @@ foreach ($svc in $servicesToCheck) {
     }
 }
 
+# Start checking processes and starts if not running or unresponsive
+# All logged to event viewer and local logfile
 Write-Host "`nChecking processes..." -ForegroundColor Cyan
 Log-Message "--- Checking processes ---" -EventId 1003
 
@@ -119,6 +124,7 @@ foreach ($proc in $processesToCheck) {
         $msg = "Process '$($proc.Name)' not running. Starting..."
         Write-Host $msg -ForegroundColor Yellow
         Log-Message $msg -EventType "Warning" -EventId 1302
+		# Retry Command here if unresponsive
         Retry-Command -Command { Start-Process -FilePath $proc.Path } -FailureMessage "Failed to start process '$($proc.Name)'"
     }
 }
