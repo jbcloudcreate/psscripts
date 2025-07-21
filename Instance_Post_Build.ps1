@@ -121,17 +121,35 @@ MAIN MENU:
 				# Elastic Installer (Prompts) :
 				Write-Host "[INFO] Installing: Elastic Agent"
                 $installer3 = Join-Path $netlogonPath "\Elastic\elastic-agent.exe"
-                Start-Process -FilePath $installer3 -ArgumentList "install --url=https://89486c01198942bd8c8db4c4a196b18b.fleet.eu-west-2.aws.cloud.es.io:443 --enrollment-token=QVIwR1JZa0JiNG1ZYmRpZm9EdGY6WWd3MHJLQVdRS3FpdmM5N3FKNVhkQQ== --proxy-url=http://squid.arvtest.co.uk:3128" -Wait -PassThru | Out-Null
-                PAUSE
+                #Start-Process -FilePath $installer3 -ArgumentList "install --url=https://89486c01198942bd8c8db4c4a196b18b.fleet.eu-west-2.aws.cloud.es.io:443 --enrollment-token=QVIwR1JZa0JiNG1ZYmRpZm9EdGY6WWd3MHJLQVdRS3FpdmM5N3FKNVhkQQ== --proxy-url=http://squid.arvtest.co.uk:3128" -Wait -PassThru | Out-Null
+                & $installer3 install --url=https://89486c01198942bd8c8db4c4a196b18b.fleet.eu-west-2.aws.cloud.es.io:443 `
+				--enrollment-token=QVIwR1JZa0JiNG1ZYmRpZm9EdGY6WWd3MHJLQVdRS3FpdmM5N3FKNVhkQQ== `
+				--proxy-url=http://squid.arvtest.co.uk:3128
+
 				Write-Host "[INFO] Completed: Elastic Agent"
 				
 				# Install of Sysmon:
 				Write-Host "[INFO] Installing: Sysmon"
-				$installer4 = Join-Path $netlogonPath "\Sysmon\sysmon.exe"
-                Start-Process -FilePath $installer4 -ArgumentList "-accepteula -i \\$fqdn\netlogon\Sysmon\sysmonconfig-export.xml" -Wait -PassThru | Out-Null
-				Start-Process -FilePath $installer4 -ArgumentList "-accepteula -m" -Wait -PassThru | Out-Null
-                Write-Host "[INFO] Completed: Sysmon"
-								
+				#$installer4 = Join-Path $netlogonPath "\Sysmon\sysmon.exe"
+                #Start-Process -FilePath $installer4 -ArgumentList "-accepteula -i \\$fqdn\netlogon\Sysmon\sysmonconfig-export.xml" -Wait -PassThru | Out-Null
+				#Start-Process -FilePath $installer4 -ArgumentList "-accepteula -m" -Wait -PassThru | Out-Null
+                $installer4 = Join-Path $netlogonPath "\Sysmon\sysmon.exe"
+				& $installer4 -accepteula -i "\\$fqdn\netlogon\Sysmon\sysmonconfig-export.xml"
+				& $installer4 -accepteula -m
+				Write-Host "[INFO] Completed: Sysmon"
+				# Remove Windows Defender
+				try {
+					$defender = Get-WindowsFeature -Name Windows-Defender
+					if ($defender.Installed) {
+						Write-Host "[INFO] Windows Defender is installed. Uninstalling..."
+						Uninstall-WindowsFeature -Name Windows-Defender -Remove -Verbose
+					} else {
+						Write-Host "[INFO] Windows Defender is NOT installed. Skipping removal."
+					}
+				} catch {
+					Write-Error "[ERROR] Failed to check or uninstall Defender: $_"
+				}
+				
 				# Add more installers as needed:
                 # $installer2 = Join-Path $netlogonPath "anotherapp\\setup.exe"
                 # Start-Process -FilePath $installer2 -ArgumentList "/qn" -Wait -PassThru | Out-Null
