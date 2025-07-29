@@ -207,11 +207,11 @@ ICT Infrastructure Post-Build Menu
             break
         }
         Default {
-            Write-Warning "IInvalid choice. Please select 1-5 or Q."
+            Write-Warning "Invalid choice. Please select 1-5 or Q."
         }
     }
     if ($choice -ne 'Q') {
-        Write-Host "\nPress Enter to return to menu..."
+        Write-Host "Press Enter to return to menu..."
         [void][System.Console]::ReadKey($true)
     }
 } while ($true)
