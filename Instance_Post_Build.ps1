@@ -19,8 +19,6 @@ $currentUser = $env:USERNAME
 $computerName = $env:COMPUTERNAME
 
 # --- Disclaimer UI ---
-
-# --- Disclaimer UI ---
 Add-Type -AssemblyName System.Windows.Forms
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Disclaimer Agreement"
@@ -66,10 +64,11 @@ ICT Infrastructure Post-Build Menu
  3. Install Applications
  4. Set Locale, Time & Region
  5. Reboot System
+ 6. Export System Summary
  Q. Quit Script
 "@
 
-    $choice = Read-Host "Select an option (1-5 or Q)"
+    $choice = Read-Host "Select an option (1-6 or Q)"
     switch ($choice) {
         '1' {
             Write-Host "Please remember to set the DNS servers and suffix addresses in the adaptor settings before continuing"
@@ -200,6 +199,39 @@ ICT Infrastructure Post-Build Menu
         '5' {
             Write-Host "[INFO] Option 5: Reboot computer"
             shutdown.exe /r /f /t 60 /d p:2:4 /c "Restart for updates by $currentUser"
+        }
+		'6' {
+            $summaryPath = Join-Path $logDir "System_Summary_$(Get-Date -Format 'yyyyMMdd_HHmmss').html"
+            $html = @"
+<html>
+<head>
+<title>System Summary</title>
+<style>
+body { font-family: Arial; font-size: 14px; }
+h2 { color: #2a4b8d; }
+pre { background: #f4f4f4; padding: 10px; border: 1px solid #ddd; }
+</style>
+</head>
+<body>
+<h1>System Summary Report</h1>
+<p><strong>Generated on:</strong> $(Get-Date)</p>
+<h2>Hostname</h2>
+<p>$computerName</p>
+<h2>IP Addresses</h2>
+<pre>$(Get-NetIPAddress | Format-Table -AutoSize | Out-String)</pre>
+<h2>Installed Software</h2>
+<pre>$(Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* |
+Select-Object DisplayName, DisplayVersion, Publisher, InstallDate |
+Format-Table -AutoSize | Out-String)</pre>
+<h2>Windows Version</h2>
+<pre>$(Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion, OsHardwareAbstractionLayer | Format-List | Out-String)</pre>
+<h2>GPO Result</h2>
+<pre>$((gpresult /SCOPE:COMPUTER /r | Out-String).Trim())</pre>
+</body>
+</html>
+"@
+            $html | Out-File -FilePath $summaryPath -Encoding UTF8
+            Write-Host "[INFO] System summary exported to: $summaryPath"
         }
         'Q' {
             Write-Host "[INFO] Exiting..."
