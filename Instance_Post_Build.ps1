@@ -204,7 +204,7 @@ ICT Infrastructure Post-Build Menu
         'Q' {
             Write-Host "[INFO] Exiting..."
             Stop-Transcript | Out-Null
-            break
+            exit
         }
         Default {
             Write-Warning "Invalid choice. Please select 1-5 or Q."
