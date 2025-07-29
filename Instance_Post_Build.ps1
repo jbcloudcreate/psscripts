@@ -5,55 +5,71 @@
 # Author: James Buller.
 # Creation Date: Date: 3rd July 2025
 # 
-# Version 3.1
+# Version: 4.0 - Modernized UI & Structure
 #
 # =============================================================================
 
+# --- Logging Setup ---
 $logDir = "C:\\Temp\\Install"
 New-Item -Path $logDir -ItemType Directory -Force | Out-Null
-$logFile = Join-Path $logDir "script_log_$(Get-Date -Format 'ddMMyyyy_HHmmss').txt"
+$logFile = Join-Path $logDir "script_log_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
 Start-Transcript -Path $logFile -Append | Out-Null
 
 $currentUser = $env:USERNAME
 $computerName = $env:COMPUTERNAME
 
-Add-Type -AssemblyName System.Windows.Forms
-$disclaimerBox = New-Object System.Windows.Forms.Form
-$disclaimerBox.Text = "Disclaimer Agreement"
-$disclaimerBox.Width = 500
-$disclaimerBox.Height = 300
-$label = New-Object System.Windows.Forms.Label
-$label.Left = 10; $label.Top = 10; $label.Width = 460; $label.Height = 200
-$label.Text = "WARNING: This script makes changes to system and domain settings. By clicking AGREE, you acknowledge you understand the risks. If you do not agree, the script will exit."
-$agreeButton = New-Object System.Windows.Forms.Button
-$agreeButton.Text = "AGREE"; $agreeButton.Left = 150; $agreeButton.Top = 220; $agreeButton.Add_Click({$disclaimerBox.Tag = 'AGREE'; $disclaimerBox.Close()})
-$declineButton = New-Object System.Windows.Forms.Button
-$declineButton.Text = "DECLINE"; $declineButton.Left = 250; $declineButton.Top = 220; $declineButton.Add_Click({$disclaimerBox.Tag = 'DECLINE'; $disclaimerBox.Close()})
-$disclaimerBox.Controls.AddRange(@($label, $agreeButton, $declineButton))
-$disclaimerBox.ShowDialog() | Out-Null
+# --- Disclaimer UI ---
 
-if ($disclaimerBox.Tag -ne 'AGREE') {
-    Write-Host "You declined the disclaimer. Exiting script."
+# --- Disclaimer UI ---
+Add-Type -AssemblyName System.Windows.Forms
+$form = New-Object System.Windows.Forms.Form
+$form.Text = "Disclaimer Agreement"
+$form.Size = New-Object System.Drawing.Size(500, 300)
+$form.StartPosition = "CenterScreen"
+
+$label = New-Object System.Windows.Forms.Label
+$label.Size = New-Object System.Drawing.Size(460, 180)
+$label.Location = New-Object System.Drawing.Point(10,10)
+$label.Text = "WARNING: This script will make changes to the system.\n\nClick AGREE to continue or DECLINE to exit."
+
+$agree = New-Object System.Windows.Forms.Button
+$agree.Text = "AGREE"
+$agree.Location = New-Object System.Drawing.Point(120, 200)
+$agree.Add_Click({ $form.Tag = 'AGREE'; $form.Close() })
+
+$decline = New-Object System.Windows.Forms.Button
+$decline.Text = "DECLINE"
+$decline.Location = New-Object System.Drawing.Point(240, 200)
+$decline.Add_Click({ $form.Tag = 'DECLINE'; $form.Close() })
+
+$form.Controls.AddRange(@($label, $agree, $decline))
+$form.ShowDialog() | Out-Null
+
+if ($form.Tag -ne 'AGREE') {
+    Write-Host "[INFO] Disclaimer not accepted. Exiting..."
     Stop-Transcript | Out-Null
     exit
-} else {
-    $acceptTime = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-    Write-Host "[INFO] Disclaimer accepted at $acceptTime by user $currentUser on computer $computerName"
-    Add-Content -Path $logFile -Value "[INFO] Disclaimer accepted at $acceptTime by user $currentUser on computer $computerName"
 }
-Clear-Host
+
+Write-Host "[INFO] Disclaimer accepted by $currentUser on $computerName at $(Get-Date)"
+
+# --- Main Menu Loop ---
+
 do {
+    Clear-Host
     Write-Host @"
-ICT Infrastructure Main Menu:
-  1. Join Domain
-  2. Run gpupdate
-  3. Install applications
-  4. Set time, region and language
-  5. Reboot computer
-  Q. Quit script
+====================================
+ICT Infrastructure Post-Build Menu
+====================================
+ 1. Join Domain
+ 2. Run Gpupdate
+ 3. Install Applications
+ 4. Set Locale, Time & Region
+ 5. Reboot System
+ Q. Quit Script
 "@
 
-    $choice = Read-Host "Enter 1, 2, 3, 4, 5, or Q"
+    $choice = Read-Host "Select an option (1-5 or Q)"
     switch ($choice) {
         '1' {
             Write-Host "Please remember to set the DNS servers and suffix addresses in the adaptor settings before continuing"
@@ -186,15 +202,16 @@ ICT Infrastructure Main Menu:
             shutdown.exe /r /f /t 60 /d p:2:4 /c "Restart for updates by $currentUser"
         }
         'Q' {
-            Write-Host "[INFO] Exiting script. Goodbye."
+            Write-Host "[INFO] Exiting..."
             Stop-Transcript | Out-Null
-            exit
+            break
         }
         Default {
-            Write-Warning "Invalid option. Please enter 1, 2, 3, 4, 5, or Q."
+            Write-Warning "IInvalid choice. Please select 1-5 or Q."
         }
     }
-    Write-Host "Press any key to Return to Main Menu..."
-    Pause
-    Clear-Host
+    if ($choice -ne 'Q') {
+        Write-Host "\nPress Enter to return to menu..."
+        [void][System.Console]::ReadKey($true)
+    }
 } while ($true)
