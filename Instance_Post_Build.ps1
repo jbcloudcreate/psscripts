@@ -5,6 +5,8 @@
 # Author: James Buller.
 # Creation Date: Date: 3rd July 2025
 # 
+# Version 3.1
+#
 # =============================================================================
 
 $logDir = "C:\\Temp\\Install"
@@ -42,11 +44,11 @@ if ($disclaimerBox.Tag -ne 'AGREE') {
 Clear-Host
 do {
     Write-Host @"
-MAIN MENU:
-  1. Join Domain (no reboot)
-  2. Run gpupdate (3x with 20s sleep)
-  3. Install application (custom block)
-  4. View log file
+ICT Infrastructure Main Menu:
+  1. Join Domain
+  2. Run gpupdate
+  3. Install applications
+  4. Set time, region and language
   5. Reboot computer
   Q. Quit script
 "@
@@ -121,7 +123,6 @@ MAIN MENU:
 				# Elastic Installer (Prompts) :
 				Write-Host "[INFO] Installing: Elastic Agent"
                 $installer3 = Join-Path $netlogonPath "\Elastic\elastic-agent.exe"
-                #Start-Process -FilePath $installer3 -ArgumentList "install --url=https://89486c01198942bd8c8db4c4a196b18b.fleet.eu-west-2.aws.cloud.es.io:443 --enrollment-token=QVIwR1JZa0JiNG1ZYmRpZm9EdGY6WWd3MHJLQVdRS3FpdmM5N3FKNVhkQQ== --proxy-url=http://squid.arvtest.co.uk:3128" -Wait -PassThru | Out-Null
                 & $installer3 install --url=https://89486c01198942bd8c8db4c4a196b18b.fleet.eu-west-2.aws.cloud.es.io:443 `
 				--enrollment-token=QVIwR1JZa0JiNG1ZYmRpZm9EdGY6WWd3MHJLQVdRS3FpdmM5N3FKNVhkQQ== `
 				--proxy-url=http://squid.arvtest.co.uk:3128
@@ -130,14 +131,13 @@ MAIN MENU:
 				
 				# Install of Sysmon:
 				Write-Host "[INFO] Installing: Sysmon"
-				#$installer4 = Join-Path $netlogonPath "\Sysmon\sysmon.exe"
-                #Start-Process -FilePath $installer4 -ArgumentList "-accepteula -i \\$fqdn\netlogon\Sysmon\sysmonconfig-export.xml" -Wait -PassThru | Out-Null
-				#Start-Process -FilePath $installer4 -ArgumentList "-accepteula -m" -Wait -PassThru | Out-Null
-                $installer4 = Join-Path $netlogonPath "\Sysmon\sysmon.exe"
+				$installer4 = Join-Path $netlogonPath "\Sysmon\sysmon.exe"
 				& $installer4 -accepteula -i "\\$fqdn\netlogon\Sysmon\sysmonconfig-export.xml"
 				& $installer4 -accepteula -m
 				Write-Host "[INFO] Completed: Sysmon"
+				
 				# Remove Windows Defender
+				"[INFO] Un-installing: Windows Defender"
 				try {
 					$defender = Get-WindowsFeature -Name Windows-Defender
 					if ($defender.Installed) {
@@ -158,12 +158,27 @@ MAIN MENU:
             }
         }
         '4' {
-            Write-Host "[INFO] Option 4: View logs"
-            $latestLog = Get-ChildItem -Path C:\\Temp\\Install -Filter *.txt | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-            if ($latestLog) {
-                Get-Content -Path $latestLog.FullName | Out-Host -Paging
-            } else {
-                Write-Warning "No log files found in C:\\Temp\\Install."
+            Write-Host "[INFO] Option 4: Set Time, Region, and Language Settings"
+            try {
+                Write-Output "Setting system locale to en-GB..."
+                Set-WinSystemLocale -SystemLocale en-GB
+                Write-Output "System locale set to: $(Get-WinSystemLocale)"
+
+                Write-Output "Setting culture to en-GB..."
+                Set-Culture -CultureInfo en-GB
+                Write-Output "Culture set to: $(Get-Culture)"
+
+                Write-Output "Setting home location to United Kingdom (GeoID 242)..."
+                Set-WinHomeLocation -GeoId 242
+                Write-Output "Home location set to GeoID: $(Get-WinHomeLocation)"
+
+                Write-Output "Setting time zone to GMT Standard Time..."
+                Set-TimeZone -Id "GMT Standard Time"
+                Write-Output "Time zone set to: $(Get-TimeZone).Id"
+
+                Write-Output "All settings have been applied successfully."
+            } catch {
+                Write-Error "[ERROR] Failed to apply regional settings: $_"
             }
         }
         '5' {
