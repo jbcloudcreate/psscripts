@@ -1,6 +1,6 @@
 # Prompt for secure password input
 $securePassword = Read-Host "Enter password for local admin user" -AsSecureString
-$Username = "ssc-localadmin"
+$Username = "sys-localadmin"
 $Group = "Administrators"
 
 # Define log file path and ensure directory exists
