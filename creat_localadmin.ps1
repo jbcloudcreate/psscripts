@@ -1,20 +1,56 @@
+# Prompt for secure password input
+$securePassword = Read-Host "Enter password for local admin user" -AsSecureString
 $Username = "ssc-localadmin"
-$Password = "}WJx,<=ry7kFMi.38b57"
-$group = "Administrators"
-$adsi = [ADSI]"WinNT://$env:COMPUTERNAME"
-$existing = $adsi.Children | where {$_.SchemaClassName -eq 'user' -and $_.Name -eq $Username }
-if ($existing -eq $null) {
-    Write-Host "Creating new local user $Username."
-    & NET USER $Username $Password /add /y /expires:never
+$Group = "Administrators"
 
-    Write-Host "Adding local user $Username to $group."
-    & NET LOCALGROUP $group $Username /add
+# Define log file path and ensure directory exists
+$logDir = "C:\temp"
+if (-not (Test-Path -Path $logDir)) {
+    New-Item -Path $logDir -ItemType Directory -Force | Out-Null
 }
-else {
-    Write-Host "Setting password for existing local user $Username."
-    $existing.SetPassword($Password)
-}
-Write-Host "Ensuring password for $Username never expires."
-& WMIC USERACCOUNT WHERE "Name='$Username'" SET PasswordExpires=FALSE
+$logFile = "$logDir\local_admin_setup.log"
 
-Remove-Computer -UnjoinDomaincredential SSANP\james.buller -PassThru -Verbose -Restart -Force
+function Write-Log {
+    param (
+        [string]$message
+    )
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    "$timestamp - $message" | Out-File -FilePath $logFile -Append -Encoding utf8
+    Write-Output $message
+}
+
+try {
+    # Check if user exists
+    $existingUser = Get-LocalUser -Name $Username -ErrorAction SilentlyContinue
+
+    if (-not $existingUser) {
+        Write-Log "Creating new local user '$Username'."
+        New-LocalUser -Name $Username -Password $securePassword -FullName "Local Admin User" -PasswordNeverExpires -UserMayNotChangePassword
+    }
+    else {
+        Write-Log "User '$Username' already exists. Updating password."
+        $existingUser | Set-LocalUser -Password $securePassword
+    }
+
+    # Add to Administrators group
+    Write-Log "Adding '$Username' to local '$Group' group."
+    Add-LocalGroupMember -Group $Group -Member $Username -ErrorAction Stop
+
+} catch {
+    Write-Log "Failed to create or configure local user: $_"
+    exit 1
+}
+
+# Confirm before removing from domain
+$confirmation = Read-Host "Do you really want to unjoin this computer from the domain? Type YES to continue"
+if ($confirmation -eq "YES") {
+    try {
+        $domainCred = Get-Credential -Message "Enter domain admin credentials for unjoin"
+        Write-Log "Initiating domain unjoin."
+        Remove-Computer -UnjoinDomainCredential $domainCred -PassThru -Verbose -Restart -Force
+    } catch {
+        Write-Log "Failed to unjoin domain: $_"
+    }
+} else {
+    Write-Log "Domain unjoin aborted by user."
+}
